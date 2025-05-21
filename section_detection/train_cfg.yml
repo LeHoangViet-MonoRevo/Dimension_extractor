@@ -1,0 +1,8 @@
+# data.yaml
+
+train: /path/to/train/images
+val: /path/to/val/images
+
+nc: 1  # number of classes
+
+names: ['section']  # list of class names
