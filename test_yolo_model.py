@@ -6,14 +6,11 @@ import matplotlib.pyplot as plt
 from ultralytics import YOLO
 
 # Load the model
-model = YOLO(
-    "/Users/lehoangviet/Desktop/projects/model/detector/3rd_training/3rd_training_8th_time/last.pt"
-)
+model = YOLO("./section_detection_best.pt")
 # model = YOLO("../best_shap_detection.pt")
 
 # Image path
-img_dirs = glob.glob("../image_company/*/*")
-img_path = random.choice(img_dirs)
+img_path = "84b1b33011a7b22d219aaf627f41868a_2.jpg"
 
 # Run inference
 results = model(img_path)
