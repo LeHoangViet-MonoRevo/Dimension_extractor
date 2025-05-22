@@ -135,5 +135,19 @@ def extract_cross_sections_from_label(
     return regions
 
 
+def get_image_label_pairs(image_paths, label_paths):
+    # Convert to dict for quick lookup
+    images_dict = {os.path.splitext(os.path.basename(p))[0]: p for p in image_paths}
+    labels_dict = {os.path.splitext(os.path.basename(p))[0]: p for p in label_paths}
+
+    # Find common base names
+    common_keys = images_dict.keys() & labels_dict.keys()
+
+    # Create pairs
+    pairs = [(images_dict[k], labels_dict[k]) for k in common_keys]
+
+    return pairs
+
+
 if __name__ == "__main__":
     pass
