@@ -37,47 +37,47 @@ def random_move_samples_to_val(
     train_folder: str, val_folder: str, val_ratio: float = 0.2
 ):
     """
-    Randomly move image-label pairs from training folder to validation folder.
+    Randomly move image-label pairs (based on image files) from training to validation.
 
     Arguments:
     - train_folder: path to training folder (must have 'images' and 'labels' subfolders)
     - val_folder: path to validation folder (must have 'images' and 'labels' subfolders)
-    - val_ratio: fraction of samples to move from train to val
+    - val_ratio: fraction of image samples to move from train to val
     """
     train_img_dir = os.path.join(train_folder, "images")
     train_label_dir = os.path.join(train_folder, "labels")
     val_img_dir = os.path.join(val_folder, "images")
     val_label_dir = os.path.join(val_folder, "labels")
 
-    # Create validation folders if they don't exist
+    # Ensure validation folders exist
     os.makedirs(val_img_dir, exist_ok=True)
     os.makedirs(val_label_dir, exist_ok=True)
 
-    # Get all label files (assuming image files have the same base name with .jpg extension)
-    label_files = [f for f in os.listdir(train_label_dir) if f.endswith(".txt")]
-    num_to_move = int(len(label_files) * val_ratio)
+    # Get all image files
+    image_files = [f for f in os.listdir(train_img_dir) if f.lower().endswith(".jpg")]
+    num_to_move = int(len(image_files) * val_ratio)
 
-    # Randomly select label files
-    selected_labels = random.sample(label_files, num_to_move)
+    # Randomly select image files to move
+    selected_images = random.sample(image_files, num_to_move)
 
-    for label_file in selected_labels:
-        base_name = os.path.splitext(label_file)[0]
-        img_file = base_name + ".jpg"
+    for img_file in selected_images:
+        base_name = os.path.splitext(img_file)[0]
+        label_file = base_name + ".txt"
 
         # Define full paths
-        src_label_path = os.path.join(train_label_dir, label_file)
         src_img_path = os.path.join(train_img_dir, img_file)
-        dst_label_path = os.path.join(val_label_dir, label_file)
+        src_label_path = os.path.join(train_label_dir, label_file)
         dst_img_path = os.path.join(val_img_dir, img_file)
+        dst_label_path = os.path.join(val_label_dir, label_file)
 
-        # Move files
-        if os.path.exists(src_img_path):
-            shutil.move(src_img_path, dst_img_path)
+        # Move image
+        shutil.move(src_img_path, dst_img_path)
+
+        # Move label if it exists
+        if os.path.exists(src_label_path):
             shutil.move(src_label_path, dst_label_path)
-        else:
-            print(f"[Warning] Image not found for label: {label_file}, skipping.")
 
-    print(f"Moved {len(selected_labels)} image-label pairs to validation set.")
+    print(f"Moved {len(selected_images)} image-label pairs to validation set.")
 
 
 def extract_cross_sections_from_label(
