@@ -18,13 +18,27 @@ class SectionDetector(BaseYOLO):
         """
         Receive the results and then return the detection of cross sections.
         """
-        bbxes = results[0].boxes.data.numpy().tolist()
-        orig_image = results.orig_img
+        if not results or len(results) == 0:
+            return [], []
+
+        result = results[0]
+
+        if (
+            result.boxes is None
+            or result.boxes.data is None
+            or len(result.boxes.data) == 0
+        ):
+            return [], []
+
+        bbxes = result.boxes.data.cpu().numpy().tolist()
+        orig_image = result.orig_img
         sections = []
+
         for bbx in bbxes:
             x1, y1, x2, y2, conf_score, cls = bbx
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
             sections.append(orig_image[y1:y2, x1:x2, :])
+
         return sections, bbxes
 
 

@@ -19,13 +19,24 @@ class DimensionLineDetector(BaseYOLO):
         """
         Receive the cross section and return the detection of dimension lines.
         """
-        bbxes = results[0].boxes.data.numpy().tolist()
-        orig_image = results.orig_img
+        result = results[0]  # one image, so first result
+        if (
+            result.boxes is None
+            or result.boxes.data is None
+            or len(result.boxes.data) == 0
+        ):
+            return [], []  # no detections
+
+        bbxes = result.boxes.data.cpu().numpy().tolist()
+        orig_image = result.orig_img
         dimension_regions = []
+
         for bbx in bbxes:
             x1, y1, x2, y2, conf_score, cls = bbx
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-            dimension_regions.append(orig_image[y1:y2, x1:x2, :])
+            region = orig_image[y1:y2, x1:x2, :]
+            dimension_regions.append(region)
+
         return dimension_regions, bbxes
 
 

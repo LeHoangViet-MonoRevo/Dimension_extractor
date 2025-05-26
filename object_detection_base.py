@@ -23,7 +23,11 @@ class BaseYOLO(ABC):
         if isinstance(image, (str, Path)):
             image = cv2.imread(str(image))
 
-        results = self.model(image, verbose=verbose)[0]
+        results = self.model(image, verbose=verbose)
+
+        if not results or len(results) == 0:
+            return self.postprocess([])
+
         return self.postprocess(results)
 
     @abstractmethod
