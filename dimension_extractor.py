@@ -6,6 +6,7 @@ import numpy as np
 from dimension_line_detection.dimension_line_detector import \
     DimensionLineDetector
 from section_detection.section_detector import SectionDetector
+from text_reader.text_reader import PaddleTextReader
 
 
 class DimensionExtractor:
@@ -17,6 +18,7 @@ class DimensionExtractor:
         self.dimension_line_detector = DimensionLineDetector(
             dimension_line_detector_path
         )
+        self.text_reader = PaddleTextReader()
 
     def run(self, image: Union[str, np.ndarray]):
         if isinstance(image, str):
@@ -30,7 +32,21 @@ class DimensionExtractor:
                 self.dimension_line_detector.run(cross_section)[0]
             )
 
-        return dimension_line_regions
+        output = []
+        for dimension_line_region in dimension_line_regions:
+            pred_texts, pred_polys, pred_confs = self.text_reader.run(
+                dimension_line_region
+            )
+            output.append(
+                {
+                    "image": dimension_line_region,
+                    "texts": pred_texts,
+                    "polys": pred_polys,
+                    "confs": pred_confs,
+                }
+            )
+
+        return output
 
 
 if __name__ == "__main__":
