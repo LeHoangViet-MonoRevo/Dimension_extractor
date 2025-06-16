@@ -10,6 +10,35 @@ from text_reader.text_reader import PaddleTextReader
 
 
 class DimensionExtractor:
+    """
+    Pipeline for extracting object dimensions (Width x Height x Length) from engineering drawings.
+
+    This class processes an input drawing to identify dimensional annotations
+    and extract the corresponding measurements using a three-stage pipeline:
+
+        ┌────────────────────┐
+        │   Input Drawing    │
+        └────────┬───────────┘
+                 │
+                 ▼
+        ┌────────────────────┐
+        │  SectionDetector   │  - Detects cross-sectional views.
+        └────────┬───────────┘
+                 │
+                 ▼
+        ┌──────────────────────┐
+        │ DimensionLineDetector│ - Identifies dimension lines within sections.
+        └────────┬─────────────┘
+                 │
+                 ▼
+        ┌────────────────────┐
+        │   TextReader (OCR) │ - Reads dimension values from lines.
+        └────────────────────┘
+
+    Returns a structured list of detected dimension line regions along with
+    their recognized texts, positions, and confidence scores.
+    """
+
     def __init__(
         self, section_detector_path: str, dimension_line_detector_path: str
     ) -> None:
@@ -21,6 +50,27 @@ class DimensionExtractor:
         self.text_reader = PaddleTextReader()
 
     def run(self, image: Union[str, np.ndarray]):
+        """
+        Execute the full dimension extraction pipeline on a given image.
+
+        Steps:
+            1. Load image if a file path is provided.
+            2. Detect cross sections using the SectionDetector.
+            3. For each cross section, detect dimension lines.
+            4. For each dimension line region, extract text using OCR.
+
+        Args:
+            image (Union[str, np.ndarray]): Input image, either as a file path or an OpenCV image (numpy array).
+
+        Returns:
+            List[Dict]: A list of results for each detected dimension line region.
+                Each result is a dictionary with:
+                    - 'image' (np.ndarray): Cropped image region of the dimension line.
+                    - 'texts' (List[str]): Recognized text strings.
+                    - 'polys' (List[List[Tuple[int, int]]]): Polygons (bounding regions) of detected texts.
+                    - 'confs' (List[float]): Confidence scores for each text prediction.
+        """
+
         if isinstance(image, str):
             image = cv2.imread(image)
 
