@@ -12,11 +12,24 @@ from object_detection_base import BaseYOLO
 
 
 class SectionDetector(BaseYOLO):
+    """
+    Ultralytics YOLO-based detector for extracting cross section regions from an engineering drawing.
+
+    Inherits from:
+        BaseYOLO: Custom base class for handling YOLO detection logic.
+    """
     def postprocess(
         self, results: ultralytics.engine.results.Results
     ) -> List[np.ndarray]:
         """
-        Receive the results and then return the detection of cross sections.
+        Process YOLO model output to extract image regions containing cross sections.
+
+        Args:
+            results (ultralytics.engine.results.Results): Detection results from the YOLO model.
+
+        Returns:
+            List[np.ndarray]: Cropped image regions of detected cross sections.
+            List[List[float]]: Corresponding bounding boxes [x1, y1, x2, y2, conf, class_id].
         """
         if not results or len(results) == 0:
             return [], []
