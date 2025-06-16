@@ -13,11 +13,22 @@ from object_detection_base import BaseYOLO
 
 
 class DimensionLineDetector(BaseYOLO):
+    """
+    YOLO-based detector for extracting dimension lines from input images.
+    Inherits from BaseYOLO and implements post-processing to crop detected regions.
+    """
     def postprocess(
         self, results: ultralytics.engine.results.Results
     ) -> List[np.ndarray]:
         """
-        Receive the cross section and return the detection of dimension lines.
+        Process YOLO model output to extract regions containing dimension lines.
+        
+        Args:
+            results (ultralytics.engine.results.Results): YOLO model prediction results (from the SectionDetection model).
+            
+        Returns:
+            List[np.ndarray]: Cropped image regions containing dimension lines.
+            List[List[float]]: Corresponding bounding box data [x1, y1, x2, y2, conf, class_id].
         """
         result = results[0]  # one image, so first result
         if (
