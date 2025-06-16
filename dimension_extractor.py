@@ -180,12 +180,17 @@ class DimensionExtractor:
 
 
 if __name__ == "__main__":
+    from tqdm import tqdm
+    import glob
+    import os
     extractor = DimensionExtractor(
         "section_detection_best.pt", "dimension_line_detector.pt"
     )
-    input_path = "../image_company/113/2d7573f20f7cb2b911135543119fc7d7_0.jpg"
-    image = cv2.imread(input_path)
-    result = extractor.run(image)
-    annotated = extractor.visualise(image, result, False)
-    cv2.imwrite("annotated.png", annotated)
-    print(f"result: {result}")
+
+    img_dirs = glob.glob("kubo_dataset/*.png")
+    for img_dir in tqdm(img_dirs):
+        image = cv2.imread(img_dir)
+        result = extractor.run(img_dir)
+        annotated = extractor.visualise(image, result, False)
+        cv2.imwrite(os.path.join("./kubo_dataset_pred/", os.path.basename(img_dir)), annotated)
+
