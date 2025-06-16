@@ -107,14 +107,13 @@ class DimensionExtractor:
         annotated = image.copy()
 
         for section_idx, section in enumerate(result):
-            # Section bbox: (x1, y1, x2, y2)
-            print(f"section.bbxes: {section.bbxes}")
-            x1, y1, x2, y2 = map(int, section.bbxes[:4])
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            # Section bounding box in original image
+            sx1, sy1, sx2, sy2 = map(int, section.bbxes[:4])
+            cv2.rectangle(annotated, (sx1, sy1), (sx2, sy2), (255, 0, 0), 2)
             cv2.putText(
                 annotated,
                 f"Section {section_idx}",
-                (x1, max(0, y1 - 10)),
+                (sx1, max(0, sy1 - 10)),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.5,
                 (255, 0, 0),
@@ -122,12 +121,18 @@ class DimensionExtractor:
             )
 
             for dim_idx, dim_line in enumerate(section.dimension_lines):
+                # DimLine bbox is relative to section
                 dx1, dy1, dx2, dy2 = map(int, dim_line.bbx[:4])
-                cv2.rectangle(annotated, (dx1, dy1), (dx2, dy2), (0, 0, 255), 1)
+                abs_dx1, abs_dy1 = sx1 + dx1, sy1 + dy1
+                abs_dx2, abs_dy2 = sx1 + dx2, sy1 + dy2
+
+                cv2.rectangle(
+                    annotated, (abs_dx1, abs_dy1), (abs_dx2, abs_dy2), (0, 0, 255), 1
+                )
                 cv2.putText(
                     annotated,
                     f"DimLine {dim_idx}",
-                    (dx1, max(0, dy1 - 5)),
+                    (abs_dx1, max(0, abs_dy1 - 5)),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.4,
                     (0, 0, 255),
@@ -135,11 +140,21 @@ class DimensionExtractor:
                 )
 
                 for ocr in dim_line.ocr_results:
-                    poly = np.array(ocr.poly, dtype=np.int32)
-                    cv2.polylines(
-                        annotated, [poly], isClosed=True, color=(0, 255, 0), thickness=2
+                    # Each OCR poly is relative to dimension line
+                    adjusted_poly = np.array(
+                        [[pt[0] + dx1 + sx1, pt[1] + dy1 + sy1] for pt in ocr.poly],
+                        dtype=np.int32,
                     )
-                    x_text, y_text = poly[0]
+
+                    cv2.polylines(
+                        annotated,
+                        [adjusted_poly],
+                        isClosed=True,
+                        color=(0, 255, 0),
+                        thickness=2,
+                    )
+
+                    x_text, y_text = adjusted_poly[0]
                     cv2.putText(
                         annotated,
                         ocr.text,
@@ -171,6 +186,6 @@ if __name__ == "__main__":
     input_path = "../image_company/113/2d7573f20f7cb2b911135543119fc7d7_0.jpg"
     image = cv2.imread(input_path)
     result = extractor.run(image)
-    annotated = extractor.visualise(image, result)
+    annotated = extractor.visualise(image, result, False)
     cv2.imwrite("annotated.png", annotated)
     print(f"result: {result}")
