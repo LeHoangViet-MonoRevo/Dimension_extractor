@@ -1,9 +1,11 @@
-from typing import Union
+from typing import List, Union
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
+from dimension_extractor_data_utils import (CrossSectionData,
+                                            DimensionLineData, OCRData)
 from dimension_line_detection.dimension_line_detector import \
     DimensionLineDetector
 from section_detection.section_detector import SectionDetector
@@ -50,7 +52,7 @@ class DimensionExtractor:
         )
         self.text_reader = PaddleTextReader()
 
-    def run(self, image: Union[str, np.ndarray]):
+    def run(self, image: Union[str, np.ndarray]) -> List[CrossSectionData]:
         """
         Execute the full dimension extraction pipeline on a given image.
 
@@ -79,75 +81,90 @@ class DimensionExtractor:
 
         cross_sections, cross_section_bbxes = self.section_detector.run(image)
 
-        dimension_line_regions = []
-        for cross_section in cross_sections:
-            dim_lines, _ = self.dimension_line_detector.run(cross_section)
-            dimension_line_regions.extend(dim_lines)
-
-        ocr_results = []
-        for region in dimension_line_regions:
-            pred_texts, pred_polys, pred_confs = self.text_reader.run(region)
-            ocr_results.append(
-                {
-                    "image": region,
-                    "texts": pred_texts,
-                    "polys": pred_polys,
-                    "confs": pred_confs,
-                }
+        all_results = []
+        for idx, (cross_section_img, bbox) in enumerate(
+            zip(cross_sections, cross_section_bbxes)
+        ):
+            dim_lines, dim_line_bbxes = self.dimension_line_detector.run(
+                cross_section_img
             )
+            dim_line_results = []
 
-        return {
-            "image": image,
-            "cross_section_bboxes": cross_section_bbxes,
-            "dimension_line_regions": dimension_line_regions,
-            "ocr_results": ocr_results,
-        }
+            for dim_img, dim_bbx in zip(dim_lines, dim_line_bbxes):
+                texts, polys, confs = self.text_reader.run(dim_img)
+                ocr_entries = [
+                    OCRData(text=t, poly=p, conf=c)
+                    for t, p, c in zip(texts, polys, confs)
+                ]
+                dim_line_results.append(
+                    DimensionLineData(
+                        image=dim_img, bbx=dim_bbx, ocr_results=ocr_entries
+                    )
+                )
 
-    def visualise(self, result: dict, show_result: bool = False):
-        """
-        Visualise the extraction result:
-        - Original image on left
-        - Annotated image on right with section boxes, OCR polygons, and labels
+            section_data = CrossSectionData(
+                image=cross_section_img,
+                bbxes=bbox,
+                dimension_lines=dim_line_results,
+            )
+            all_results.append(section_data)
 
-        Args:
-            result (dict): Output of self.run()
-        """
-        image = result["image"]
+        return all_results
+
+    def visualise(
+        self,
+        image: np.ndarray,
+        result: List[CrossSectionData],
+        show_result: bool = False,
+    ):
+
         annotated = image.copy()
-
-        # Draw section bounding boxes
-        for box in result["cross_section_bboxes"]:
-            x1, y1, x2, y2, *_ = map(int, box)
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 0, 0), 2)
+        for section_idx, section in enumerate(result):
+            # Draw section bbox
+            poly = np.array(section.bbxes)
+            print(f"poly: {poly}")
+            x, y, w, h = cv2.boundingRect(poly.astype(np.int32))
+            cv2.rectangle(annotated, (x, y), (x + w, y + h), (255, 0, 0), 2)
             cv2.putText(
                 annotated,
-                "Section",
-                (x1, y1 - 5),
+                f"Section {section_idx}",
+                (x, max(0, y - 10)),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.5,
                 (255, 0, 0),
                 1,
             )
 
-        # Draw OCR results
-        for ocr in result["ocr_results"]:
-            for poly, text in zip(ocr["polys"], ocr["texts"]):
-                poly = np.array(poly).astype(np.int32)
-                cv2.polylines(
-                    annotated, [poly], isClosed=True, color=(0, 255, 0), thickness=2
-                )
-                x, y = poly[0]
+            for dim_idx, dim_line in enumerate(section.dimension_lines):
+                # Just a visual cue; not exact position since dim_line is cropped from section
+                dx, dy, dw, dh = dim_line.bbx
+                cv2.rectangle(annotated, (dx, dy), (dx + dw, dy + dh), (0, 0, 255), 1)
                 cv2.putText(
                     annotated,
-                    text,
-                    (x, y - 5),
+                    f"DimLine {dim_idx}",
+                    (dx, max(0, dy - 5)),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 255, 0),
+                    0.4,
+                    (0, 0, 255),
                     1,
                 )
 
-        # Show side by side
+                for ocr in dim_line.ocr_results:
+                    poly = np.array(ocr.poly).astype(np.int32)
+                    cv2.polylines(
+                        annotated, [poly], isClosed=True, color=(0, 255, 0), thickness=2
+                    )
+                    x_text, y_text = poly[0]
+                    cv2.putText(
+                        annotated,
+                        ocr.text,
+                        (x_text, max(0, y_text - 5)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.4,
+                        (0, 255, 0),
+                        1,
+                    )
+
         orig_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
         stacked = np.hstack((orig_rgb, annotated_rgb))
@@ -159,15 +176,16 @@ class DimensionExtractor:
             plt.axis("off")
             plt.show()
 
-        return stacked  # Optional: return annotated image for saving
+        return stacked
 
 
 if __name__ == "__main__":
     extractor = DimensionExtractor(
         "section_detection_best.pt", "dimension_line_detector.pt"
     )
-    result = extractor.run(
-        "../image_company/113/2d7573f20f7cb2b911135543119fc7d7_0.jpg"
-    )
-    annotated = extractor.visualise(result)
-    cv2.imwrite("annotated.png", annotated)
+    input_path = "../image_company/113/2d7573f20f7cb2b911135543119fc7d7_0.jpg"
+    image = cv2.imread(input_path)
+    result = extractor.run(image)
+    # annotated = extractor.visualise(image, result)
+    # cv2.imwrite("annotated.png", annotated)
+    print(f"result: {result}")
