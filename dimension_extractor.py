@@ -1,6 +1,7 @@
 from typing import Union
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 from dimension_line_detection.dimension_line_detector import \
@@ -75,37 +76,98 @@ class DimensionExtractor:
             image = cv2.imread(image)
 
         assert image is not None, "Image is None, please re-check!!"
+
         cross_sections, cross_section_bbxes = self.section_detector.run(image)
+
         dimension_line_regions = []
         for cross_section in cross_sections:
-            dimension_line_regions.extend(
-                self.dimension_line_detector.run(cross_section)[0]
-            )
+            dim_lines, _ = self.dimension_line_detector.run(cross_section)
+            dimension_line_regions.extend(dim_lines)
 
-        output = []
-        for dimension_line_region in dimension_line_regions:
-            pred_texts, pred_polys, pred_confs = self.text_reader.run(
-                dimension_line_region
-            )
-            output.append(
+        ocr_results = []
+        for region in dimension_line_regions:
+            pred_texts, pred_polys, pred_confs = self.text_reader.run(region)
+            ocr_results.append(
                 {
-                    "image": dimension_line_region,
+                    "image": region,
                     "texts": pred_texts,
                     "polys": pred_polys,
                     "confs": pred_confs,
                 }
             )
 
-        return output
+        return {
+            "image": image,
+            "cross_section_bboxes": cross_section_bbxes,
+            "dimension_line_regions": dimension_line_regions,
+            "ocr_results": ocr_results,
+        }
+
+    def visualise(self, result: dict, show_result: bool = False):
+        """
+        Visualise the extraction result:
+        - Original image on left
+        - Annotated image on right with section boxes, OCR polygons, and labels
+
+        Args:
+            result (dict): Output of self.run()
+        """
+        image = result["image"]
+        annotated = image.copy()
+
+        # Draw section bounding boxes
+        for box in result["cross_section_bboxes"]:
+            x1, y1, x2, y2, *_ = map(int, box)
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            cv2.putText(
+                annotated,
+                "Section",
+                (x1, y1 - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 0, 0),
+                1,
+            )
+
+        # Draw OCR results
+        for ocr in result["ocr_results"]:
+            for poly, text in zip(ocr["polys"], ocr["texts"]):
+                poly = np.array(poly).astype(np.int32)
+                cv2.polylines(
+                    annotated, [poly], isClosed=True, color=(0, 255, 0), thickness=2
+                )
+                x, y = poly[0]
+                cv2.putText(
+                    annotated,
+                    text,
+                    (x, y - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 255, 0),
+                    1,
+                )
+
+        # Show side by side
+        orig_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+        stacked = np.hstack((orig_rgb, annotated_rgb))
+
+        if show_result:
+            plt.figure(figsize=(16, 10))
+            plt.imshow(stacked)
+            plt.title("Original (Left) vs Annotated (Right)")
+            plt.axis("off")
+            plt.show()
+
+        return stacked  # Optional: return annotated image for saving
 
 
 if __name__ == "__main__":
-    section_detector_path = "section_detection_best.pt"
-    dimension_line_detector_path = "dimension_line_detector.pt"
-    dimension_extractor = DimensionExtractor(
-        section_detector_path, dimension_line_detector_path
+    extractor = DimensionExtractor(
+        "section_detection_best.pt", "dimension_line_detector.pt"
     )
-
-    image = "../image_company/113/2d7573f20f7cb2b911135543119fc7d7_0.jpg"
-    dimension_line_regions = dimension_extractor.run(image)
-    print(f"Num dimension regions: {len(dimension_line_regions)}")
+    result = extractor.run(
+        "../image_company/113/2d7573f20f7cb2b911135543119fc7d7_0.jpg"
+    )
+    annotated = extractor.visualise(result)
+    cv2.imwrite("annotated.png", annotated)
