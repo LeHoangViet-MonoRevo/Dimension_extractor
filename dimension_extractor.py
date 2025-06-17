@@ -53,6 +53,23 @@ class DimensionExtractor:
         self.text_reader = PaddleTextReader()
 
     def run(self, image: Union[str, np.ndarray]) -> List[CrossSectionData]:
+        """
+        Execute the full dimension extraction pipeline on a given image.
+
+        This includes:
+            1. Section Detection: Identifies cross-sectional views in the image.
+            2. Dimension Line Detection: Locates dimension lines within each section.
+            3. OCR: Recognises and extracts text (dimension values) from each dimension line region.
+
+        Args:
+            image (Union[str, np.ndarray]): Input image. Can be a file path (str) or a Numpy array (BGR image).
+
+        Returns:
+            List[CrossSectionData]: A list of structured results per cross-section. Each item contains:
+                - The cross-sectional image.
+                - Its bounding box within the original image.
+                - A list of dimension line regions, each with its bounding box and recognised OCR data.
+        """
         if isinstance(image, str):
             image = cv2.imread(image)
 
@@ -104,6 +121,20 @@ class DimensionExtractor:
         result: List[CrossSectionData],
         show_result: bool = False,
     ):
+        """
+        Visualise the dimension extraction results on the input image.
+
+        Overlays detected sections, dimension lines, and OCR results on the original image.
+        Bounding boxes and text annotations are drawn for clarity.
+
+        Args:
+            image (np.ndarray): The original input image in BGR format.
+            result (List[CrossSectionData]): The output of the `run` method.
+            show_result (bool, optional): If True, displays the side-by-side visualisation using matplotlib.
+
+        Returns:
+            np.ndarray: A side-by-side RGB image showing the original and annotated results.
+        """
         annotated = image.copy()
 
         for section_idx, section in enumerate(result):
@@ -180,9 +211,11 @@ class DimensionExtractor:
 
 
 if __name__ == "__main__":
-    from tqdm import tqdm
     import glob
     import os
+
+    from tqdm import tqdm
+
     extractor = DimensionExtractor(
         "section_detection_best.pt", "dimension_line_detector.pt"
     )
@@ -192,5 +225,6 @@ if __name__ == "__main__":
         image = cv2.imread(img_dir)
         result = extractor.run(img_dir)
         annotated = extractor.visualise(image, result, False)
-        cv2.imwrite(os.path.join("./kubo_dataset_pred/", os.path.basename(img_dir)), annotated)
-
+        cv2.imwrite(
+            os.path.join("./kubo_dataset_pred/", os.path.basename(img_dir)), annotated
+        )
