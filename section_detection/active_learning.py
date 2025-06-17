@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 from section_detector import SectionDetector
 from tqdm import tqdm
@@ -48,38 +47,61 @@ class ActiveLearningSectionSampler:
 
     def save_candidate(self, image, img_path, boxes):
         """
-        Save the image with low-confidence boxes drawn on it.
+        Save the image with low-confidence boxes drawn on it using cv2.
         """
         filename = Path(img_path).name
         save_path = os.path.join(self.save_dir, filename)
 
-        # Draw annotations
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        fig, ax = plt.subplots(figsize=(10, 8))
-        ax.imshow(image_rgb)
+        # Create a copy of the image to draw on
+        image_with_boxes = image.copy()
 
+        # Draw bounding boxes and confidence scores
         for box, conf in boxes:
             x1, y1, x2, y2 = map(int, box)
-            rect = plt.Rectangle(
-                (x1, y1),
-                x2 - x1,
-                y2 - y1,
-                linewidth=2,
-                edgecolor="orange",
-                facecolor="none",
-            )
-            ax.add_patch(rect)
-            ax.text(x1, y1 - 10, f"{conf:.2f}", color="orange", backgroundcolor="white")
 
-        ax.axis("off")
-        plt.tight_layout()
-        fig.savefig(save_path)
-        plt.close(fig)
+            # Draw rectangle
+            cv2.rectangle(
+                image_with_boxes, (x1, y1), (x2, y2), (0, 165, 255), 2
+            )  # Orange color in BGR
+
+            # Prepare confidence text
+            conf_text = f"{conf:.2f}"
+
+            # Get text size for background rectangle
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.6
+            thickness = 1
+            (text_width, text_height), baseline = cv2.getTextSize(
+                conf_text, font, font_scale, thickness
+            )
+
+            # Draw background rectangle for text
+            cv2.rectangle(
+                image_with_boxes,
+                (x1, y1 - text_height - baseline - 5),
+                (x1 + text_width + 5, y1),
+                (255, 255, 255),  # White background
+                -1,
+            )
+
+            # Draw text
+            cv2.putText(
+                image_with_boxes,
+                conf_text,
+                (x1 + 2, y1 - 5),
+                font,
+                font_scale,
+                (0, 165, 255),  # Orange text in BGR
+                thickness,
+            )
+
+        # Save the image
+        cv2.imwrite(save_path, image_with_boxes)
 
 
 if __name__ == "__main__":
     sampler = ActiveLearningSectionSampler(
-        model_path="section_detection_best.pt",
+        model_path="section_detector_best_2nd.pt",
         image_dir="../image_company/",
         save_dir="active_learning_candidates",
         conf_threshold=0.4,  # Save samples where confidence < 0.4
