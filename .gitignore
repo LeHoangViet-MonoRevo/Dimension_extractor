@@ -34,3 +34,4 @@ temp/
 *.cache
 *.csv
 *.pdf
+*.stl
