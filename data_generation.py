@@ -5,7 +5,8 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import trimesh
-from matplotlib.patches import FancyArrowPatch, Rectangle
+from matplotlib.patches import FancyArrowPatch, PathPatch, Rectangle
+from matplotlib.path import Path as MplPath
 
 
 class EngineeringDrawing:
@@ -63,7 +64,7 @@ def get_mesh_dimensions(mesh):
 
 
 def add_dimension_annotations(ax, path2D, view_name):
-    """Add horizontal and vertical dimension lines with arrows."""
+    """Add horizontal and vertical dimension lines with extension lines (dotted)."""
     bounds = path2D.bounds.reshape(2, 2)
     min_pt, max_pt = bounds[0], bounds[1]
     width = max_pt[0] - min_pt[0]
@@ -72,14 +73,32 @@ def add_dimension_annotations(ax, path2D, view_name):
     offset = max(width, height) * 0.15
     arrowprops = dict(arrowstyle="<->", color="blue", linewidth=1)
 
-    # Horizontal dimension line
+    # --- Horizontal dimension line and extension lines ---
     y_dim = min_pt[1] - offset
+
+    # Extension lines (vertical dashed lines from corners)
+    ax.plot(
+        [min_pt[0], min_pt[0]],
+        [min_pt[1], y_dim],
+        linestyle="--",
+        color="gray",
+        linewidth=0.8,
+    )
+    ax.plot(
+        [max_pt[0], max_pt[0]],
+        [max_pt[1], y_dim],
+        linestyle="--",
+        color="gray",
+        linewidth=0.8,
+    )
+
+    # Dimension arrow
     ax.annotate(
         "", xy=(min_pt[0], y_dim), xytext=(max_pt[0], y_dim), arrowprops=arrowprops
     )
     ax.text(
         (min_pt[0] + max_pt[0]) / 2,
-        y_dim - offset * 0.15,
+        y_dim - offset * 0.1,
         f"{width:.2f} mm",
         ha="center",
         va="top",
@@ -87,13 +106,31 @@ def add_dimension_annotations(ax, path2D, view_name):
         color="blue",
     )
 
-    # Vertical dimension line
+    # --- Vertical dimension line and extension lines ---
     x_dim = max_pt[0] + offset
+
+    # Extension lines (horizontal dashed lines from top and bottom)
+    ax.plot(
+        [x_dim, max_pt[0]],
+        [max_pt[1], max_pt[1]],
+        linestyle="--",
+        color="gray",
+        linewidth=0.8,
+    )
+    ax.plot(
+        [x_dim, min_pt[0]],
+        [min_pt[1], min_pt[1]],
+        linestyle="--",
+        color="gray",
+        linewidth=0.8,
+    )
+
+    # Dimension arrow
     ax.annotate(
         "", xy=(x_dim, min_pt[1]), xytext=(x_dim, max_pt[1]), arrowprops=arrowprops
     )
     ax.text(
-        x_dim + offset * 0.15,
+        x_dim + offset * 0.1,
         (min_pt[1] + max_pt[1]) / 2,
         f"{height:.2f} mm",
         ha="left",
@@ -104,6 +141,11 @@ def add_dimension_annotations(ax, path2D, view_name):
     )
 
 
+def is_path_closed(path, tol=1e-2):
+    """Check if a path is closed (first and last point match within tolerance)."""
+    return np.allclose(path[0], path[-1], atol=tol)
+
+
 def plot_cross_section(ax, path2D, title, show_dimensions=True):
     """Plot the 2D cross-section with dimension lines and no axes border."""
     if path2D is None:
@@ -111,11 +153,20 @@ def plot_cross_section(ax, path2D, title, show_dimensions=True):
         ax.axis("off")
         return
 
-    # Plot outline
     for path in path2D.discrete:
-        path = np.array(path)
-        if path.shape[1] >= 2:
-            ax.plot(path[:, 0], path[:, 1], "k-", linewidth=1.5)
+        path = np.asarray(path)
+
+        # Force close path if not closed
+        if not is_path_closed(path):
+            path = np.vstack([path, path[0]])  # append start point to close loop
+
+        # Create closed polygon path manually
+        codes = (
+            [MplPath.MOVETO] + [MplPath.LINETO] * (len(path) - 2) + [MplPath.CLOSEPOLY]
+        )
+        poly_path = MplPath(path, codes)
+        patch = PathPatch(poly_path, facecolor="none", edgecolor="black", lw=1.5)
+        ax.add_patch(patch)
 
     # Add dimensions
     if show_dimensions:
@@ -129,7 +180,7 @@ def plot_cross_section(ax, path2D, title, show_dimensions=True):
     ax.set_ylim(min_pt[1] - padding, max_pt[1] + padding)
 
     ax.set_aspect("equal")
-    ax.axis("off")  # remove axes
+    ax.axis("off")
 
 
 def create_title_block(fig, drawing_info):
