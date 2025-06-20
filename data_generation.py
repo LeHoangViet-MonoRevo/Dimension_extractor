@@ -5,7 +5,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 import trimesh
-from matplotlib.patches import Rectangle
+from matplotlib.patches import FancyArrowPatch, Rectangle
 
 
 class EngineeringDrawing:
@@ -63,48 +63,39 @@ def get_mesh_dimensions(mesh):
 
 
 def add_dimension_annotations(ax, path2D, view_name):
-    """Add basic dimension annotations to the cross-section."""
-    if path2D is None:
-        return
-
+    """Add horizontal and vertical dimension lines with arrows."""
     bounds = path2D.bounds.reshape(2, 2)
     min_pt, max_pt = bounds[0], bounds[1]
     width = max_pt[0] - min_pt[0]
     height = max_pt[1] - min_pt[1]
 
-    # Add dimension lines and text
-    offset = max(width, height) * 0.1
+    offset = max(width, height) * 0.15
+    arrowprops = dict(arrowstyle="<->", color="blue", linewidth=1)
 
-    # Horizontal dimension
+    # Horizontal dimension line
     y_dim = min_pt[1] - offset
     ax.annotate(
-        "",
-        xy=(min_pt[0], y_dim),
-        xytext=(max_pt[0], y_dim),
-        arrowprops=dict(arrowstyle="<->", color="blue", lw=1),
+        "", xy=(min_pt[0], y_dim), xytext=(max_pt[0], y_dim), arrowprops=arrowprops
     )
     ax.text(
         (min_pt[0] + max_pt[0]) / 2,
-        y_dim - offset / 3,
-        f"{width:.1f}",
+        y_dim - offset * 0.15,
+        f"{width:.2f} mm",
         ha="center",
         va="top",
         fontsize=8,
         color="blue",
     )
 
-    # Vertical dimension
+    # Vertical dimension line
     x_dim = max_pt[0] + offset
     ax.annotate(
-        "",
-        xy=(x_dim, min_pt[1]),
-        xytext=(x_dim, max_pt[1]),
-        arrowprops=dict(arrowstyle="<->", color="blue", lw=1),
+        "", xy=(x_dim, min_pt[1]), xytext=(x_dim, max_pt[1]), arrowprops=arrowprops
     )
     ax.text(
-        x_dim + offset / 3,
+        x_dim + offset * 0.15,
         (min_pt[1] + max_pt[1]) / 2,
-        f"{height:.1f}",
+        f"{height:.2f} mm",
         ha="left",
         va="center",
         fontsize=8,
@@ -114,27 +105,31 @@ def add_dimension_annotations(ax, path2D, view_name):
 
 
 def plot_cross_section(ax, path2D, title, show_dimensions=True):
-    """Plot the 2D cross-section with engineering drawing style."""
+    """Plot the 2D cross-section with dimension lines and no axes border."""
     if path2D is None:
         ax.set_title(f"{title} (No section)", fontsize=10, weight="bold")
         ax.axis("off")
         return
 
-    # Plot the cross-section paths
+    # Plot outline
     for path in path2D.discrete:
         path = np.array(path)
         if path.shape[1] >= 2:
             ax.plot(path[:, 0], path[:, 1], "k-", linewidth=1.5)
 
-    # Add dimensions if requested
+    # Add dimensions
     if show_dimensions:
         add_dimension_annotations(ax, path2D, title)
 
-    # Set title and formatting
-    ax.set_title(title, fontsize=10, weight="bold", pad=20)
+    # Set consistent plot limits
+    bounds = path2D.bounds.reshape(2, 2)
+    min_pt, max_pt = bounds[0], bounds[1]
+    padding = 0.2 * max(max_pt[0] - min_pt[0], max_pt[1] - min_pt[1])
+    ax.set_xlim(min_pt[0] - padding, max_pt[0] + padding)
+    ax.set_ylim(min_pt[1] - padding, max_pt[1] + padding)
+
     ax.set_aspect("equal")
-    ax.grid(True, alpha=0.3, linewidth=0.5)
-    ax.tick_params(labelsize=8)
+    ax.axis("off")  # remove axes
 
 
 def create_title_block(fig, drawing_info):
